@@ -8,4 +8,5 @@ scipy
 seaborn
 jupyterlab
 lightgbm
+dill
 -e .

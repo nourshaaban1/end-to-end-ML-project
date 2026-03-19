@@ -4,7 +4,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 import os
+import dill
 import random
+import sys
+from pathlib import Path
+from src.exception import CustomException
 
 def seed_everything(seed=42):
     random.seed(seed)
@@ -121,3 +125,17 @@ def analyze_bivariate(df, target_column):
 
         plt.tight_layout()
         plt.show()
+
+def save_object(file_path: Path, obj):
+    """
+    Saves an object to a file using pickle.
+    """
+    try:
+        dir_path: str = os.path.dirname(file_path)
+        os.makedirs(dir_path, exist_ok=True)
+
+        with open(file_path, 'wb') as file_obj:
+            dill.dump(obj, file_obj)
+
+    except Exception as e:
+        raise CustomException(e, sys)

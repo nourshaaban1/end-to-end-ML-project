@@ -2,10 +2,12 @@ import sys
 import os 
 from dataclasses import dataclass
 from pathlib import Path
+
 import pandas as pd
 from src.logger import logging
 from src.exception import CustomException
 from sklearn.model_selection import train_test_split
+from src.components.data_transformation import DataTransformation
 
 @dataclass
 class DataIngestionConfig:
@@ -52,5 +54,15 @@ class DataIngestion:
             raise CustomException(e, sys)
         
 if __name__ == "__main__":
-    data_ingestion = DataIngestion()
-    data_ingestion.ingest_data()
+    try:
+        data_ingestion = DataIngestion()
+        data_transformation = DataTransformation()
+        
+        train_path, validation_path, test_path = data_ingestion.ingest_data()
+        train_arr, validation_arr, test_arr, preprocessor_path = data_transformation.initiate_data_transformation(
+            train_path, validation_path, test_path
+        )
+        print("Pipeline execution completed successfully")
+    except Exception as e:
+        print(f"Pipeline failed: {e}")
+        logging.error(f"Pipeline failed: {e}")
