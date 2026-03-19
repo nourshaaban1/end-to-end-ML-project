@@ -1,0 +1,10 @@
+pypdf
+PyPDF2
+numpy
+pandas
+matplotlib
+scikit-learn
+seaborn
+jupyterlab
+lightgbm
+-e .
