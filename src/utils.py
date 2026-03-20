@@ -9,6 +9,10 @@ import random
 import sys
 from pathlib import Path
 from src.exception import CustomException
+from src.logger import logging
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score
+from sklearn.model_selection import cross_validate
+from sklearn.model_selection import StratifiedKFold
 
 def seed_everything(seed=42):
     random.seed(seed)
@@ -137,5 +141,78 @@ def save_object(file_path: Path, obj):
         with open(file_path, 'wb') as file_obj:
             dill.dump(obj, file_obj)
 
+    except Exception as e:
+        raise CustomException(e, sys)
+
+def evaluate_models(X_train, y_train, X_val, y_val, models, cv_splits=5):
+    """
+    Trains and evaluates multiple models using Stratified K-Fold Cross Validation.
+    Returns a DataFrame with model names as keys and their cross-validation scores as values.
+    """
+    
+    cv_results_list = []
+    trained_models = {}
+    
+    try:
+        skf = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=42)
+
+        for model_name, model in models.items():
+            logging.info(f"Training and Evaluating {model_name}...")
+            
+            # Cross-Validation on X_train
+            cv_scores = cross_validate(
+                model, 
+                X_train, 
+                y_train,
+                cv=skf,
+                scoring=['accuracy', 'f1', 'roc_auc'],
+                n_jobs=-1
+            )
+            
+            # Train the final model on the full training set
+            model.fit(X_train, y_train)
+            trained_models[model_name] = model
+
+            # Validation Evaluation
+            y_pred = model.predict(X_val)
+            if hasattr(model, "predict_proba"):
+                y_pred_proba = model.predict_proba(X_val)[:, 1]
+            else:
+                y_pred_proba = (
+                    model.decision_function(X_val)
+                    if hasattr(model, "decision_function") else y_pred
+                )
+
+            val_acc = accuracy_score(y_val, y_pred)
+            val_f1 = f1_score(y_val, y_pred, zero_division=0)
+            val_roc_auc = roc_auc_score(y_val, y_pred_proba)
+            
+            # Store in list
+            cv_results_list.append({
+                'Model': model_name,
+                'CV Accuracy': cv_scores['test_accuracy'].mean(),
+                'CV F1-Score': cv_scores['test_f1'].mean(),
+                'CV ROC-AUC': cv_scores['test_roc_auc'].mean(),
+                'Val Accuracy': val_acc,
+                'Val F1-Score': val_f1,
+                'Val ROC-AUC': val_roc_auc
+            })
+            
+            logging.info(f"{model_name} - CV ROC-AUC: {cv_scores['test_roc_auc'].mean():.4f}, Val ROC-AUC: {val_roc_auc:.4f}")
+            
+        results_df = pd.DataFrame(cv_results_list)
+        results_df = results_df.sort_values(by='Val ROC-AUC', ascending=False).reset_index(drop=True)
+        return results_df, trained_models
+
+    except Exception as e:
+        raise CustomException(e, sys)
+
+def load_object(file_path: Path):
+    """
+    Loads an object from a file using pickle.
+    """
+    try:
+        with open(file_path, 'rb') as file_obj:
+            return dill.load(file_obj)
     except Exception as e:
         raise CustomException(e, sys)

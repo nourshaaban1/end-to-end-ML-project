@@ -7,8 +7,9 @@ import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
 from sklearn.pipeline import Pipeline
+from imblearn.over_sampling import SMOTENC
 
 from src.utils import save_object
 from src.logger import logging
@@ -18,11 +19,12 @@ from src.exception import CustomException
 @dataclass
 class DataTransformationConfig:
     preprocessor_obj_file_path: Path = Path(os.path.join("artifacts", "preprocessor.pkl"))
+    label_encoder_file_path: Path = Path(os.path.join("artifacts", "label_encoder.pkl"))
 
 
 class DataTransformation:
     def __init__(self):
-        self.config = DataTransformationConfig()
+        self.data_transformation_config = DataTransformationConfig()
 
     def get_feature_engineered_df(self, df: pd.DataFrame):
         try:
@@ -108,7 +110,7 @@ class DataTransformation:
                     df.drop(columns=["id"], inplace=True)
 
             target_column_name = "Churn"
-            
+
             # Split features and target
             input_feature_train_df = train_df.drop(columns=[target_column_name])
             target_feature_train_df = train_df[target_column_name]
@@ -123,32 +125,62 @@ class DataTransformation:
                 input_feature_test_df = test_df
                 target_feature_test_df = None
 
+            # --- Label Encoding: fit on train target only, then transform all splits ---
+            label_encoder = LabelEncoder()
+            target_feature_train_df = label_encoder.fit_transform(target_feature_train_df)
+            target_feature_validation_df = label_encoder.transform(target_feature_validation_df)
+            if target_feature_test_df is not None:
+                target_feature_test_df = label_encoder.transform(target_feature_test_df)
+
+            logging.info(f"Label encoding applied. Classes: {list(label_encoder.classes_)}")
+
+            # --- SMOTENC: must run BEFORE preprocessing (data is still mixed-type) ---
+            # Identify categorical column indices in the raw feature dataframe.
+            # These must match the columns defined in get_data_transformer_object().
+            cat_features = [
+                'gender', 'SeniorCitizen', 'Partner', 'Dependents', 'PhoneService',
+                'MultipleLines', 'InternetService', 'OnlineSecurity', 'OnlineBackup',
+                'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies',
+                'Contract', 'PaperlessBilling', 'PaymentMethod'
+            ]
+            all_columns = list(input_feature_train_df.columns)
+            cat_indices = [all_columns.index(col) for col in cat_features if col in all_columns]
+
+            logging.info(f"Applying SMOTENC on training data with {len(cat_indices)} categorical features")
+
+            smotenc = SMOTENC(categorical_features=cat_indices, random_state=42)
+            input_feature_train_resampled, target_feature_train_resampled = smotenc.fit_resample(
+                input_feature_train_df, target_feature_train_df
+            )
+
             logging.info("Applying preprocessing on training and testing datasets")
 
             preprocessor = self.get_data_transformer_object()
-            
-            # Fit and transform
-            input_feature_train_arr = preprocessor.fit_transform(input_feature_train_df)
+
+            # Fit on the resampled training data, then transform all splits
+            input_feature_train_arr = preprocessor.fit_transform(input_feature_train_resampled)
             input_feature_validation_arr = preprocessor.transform(input_feature_validation_df)
             input_feature_test_arr = preprocessor.transform(input_feature_test_df)
 
             # Combine features and target
-            train_arr = np.c_[input_feature_train_arr, np.array(target_feature_train_df)]
+            train_arr = np.c_[input_feature_train_arr, np.array(target_feature_train_resampled)]
             validation_arr = np.c_[input_feature_validation_arr, np.array(target_feature_validation_df)]
             if target_feature_test_df is not None:
                 test_arr = np.c_[input_feature_test_arr, np.array(target_feature_test_df)]
             else:
                 test_arr = input_feature_test_arr
 
-            save_object(file_path=self.config.preprocessor_obj_file_path, obj=preprocessor)
+            save_object(file_path=self.data_transformation_config.preprocessor_obj_file_path, obj=preprocessor)
+            save_object(file_path=self.data_transformation_config.label_encoder_file_path, obj=label_encoder)
 
-            logging.info("Preprocessor object saved successfully")
+            logging.info("Preprocessor and label encoder objects saved successfully")
 
             return (
                 train_arr,
                 validation_arr,
                 test_arr,
-                self.config.preprocessor_obj_file_path
+                self.data_transformation_config.preprocessor_obj_file_path,
+                self.data_transformation_config.label_encoder_file_path
             )
 
         except Exception as e:

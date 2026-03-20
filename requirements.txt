@@ -9,4 +9,5 @@ seaborn
 jupyterlab
 lightgbm
 dill
+imblearn
 -e .
