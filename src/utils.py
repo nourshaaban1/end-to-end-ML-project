@@ -198,7 +198,7 @@ def evaluate_models(X_train, y_train, X_val, y_val, models, cv_splits=5):
                 'Val ROC-AUC': val_roc_auc
             })
             
-            logging.info(f"{model_name} - CV ROC-AUC: {cv_scores['test_roc_auc'].mean():.4f}, Val ROC-AUC: {val_roc_auc:.4f}")
+            logging.info(f"{model_name} - Training ROC-AUC: {cv_scores['test_roc_auc'].mean():.4f}, Val ROC-AUC: {val_roc_auc:.4f}")
             
         results_df = pd.DataFrame(cv_results_list)
         results_df = results_df.sort_values(by='Val ROC-AUC', ascending=False).reset_index(drop=True)

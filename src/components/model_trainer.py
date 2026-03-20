@@ -9,7 +9,7 @@ from pathlib import Path
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import AdaBoostClassifier, BaggingClassifier, RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, roc_auc_score, accuracy_score
+from sklearn.metrics import classification_report, roc_auc_score, accuracy_score, f1_score
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_validate, train_test_split
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder
 from sklearn.tree import DecisionTreeClassifier
@@ -52,7 +52,7 @@ class ModelTrainer:
             best_val_acc     = best_row['Val Accuracy']
 
             logging.info(
-                f"Best model: {best_model_name} — "
+                f"Best model: {best_model_name}"
                 f"Val Accuracy: {best_val_acc:.4f}, "
                 f"Val F1: {best_val_f1:.4f}, "
                 f"Val ROC-AUC: {best_val_roc_auc:.4f}"
@@ -65,6 +65,65 @@ class ModelTrainer:
                     f"Best was {best_model_name} with {best_val_roc_auc:.4f}.",
                     sys
                 )
+
+            # --- Hyperparameter Tuning for the chosen best model ---
+            logging.info(f"Initiating Hyperparameter Tuning for {best_model_name}...")
+            
+            param_grids = {
+                'HistGradientBoostingClassifier': {
+                    'max_iter': [100, 200, 300],
+                    'learning_rate': [0.01, 0.05, 0.1],
+                    'max_depth': [None, 7, 10],
+                    'max_leaf_nodes': [31, 50]
+                },
+                'RandomForestClassifier': {
+                    'n_estimators': [100, 200, 300],
+                    'max_depth': [None, 7, 10],
+                    'min_samples_split': [2, 5]
+                }
+            }
+
+            if best_model_name in param_grids:
+                grid_search = GridSearchCV(
+                    estimator=best_model,
+                    param_grid=param_grids[best_model_name],
+                    cv=3,
+                    scoring='roc_auc',
+                    n_jobs=-1,
+                    verbose=1
+                )
+                
+                logging.info(f"Grid searching {best_model_name}...")
+                grid_search.fit(X_train, y_train)
+                
+                best_tuned_model = grid_search.best_estimator_
+                logging.info(f"GridSearch completed! Best CV ROC-AUC = {grid_search.best_score_:.4f}")
+                for p, v in grid_search.best_params_.items():
+                    logging.info(f"   - {p}: {v}")
+
+                # Re-evaluate the tuned model on the validation set
+                y_pred = best_tuned_model.predict(X_val)
+                y_pred_proba = best_tuned_model.predict_proba(X_val)[:, 1] if hasattr(best_tuned_model, "predict_proba") \
+                               else (best_tuned_model.decision_function(X_val) if hasattr(best_tuned_model, "decision_function") else y_pred)
+                
+                tuned_val_roc_auc = roc_auc_score(y_val, y_pred_proba)
+                tuned_val_f1 = f1_score(y_val, y_pred, zero_division=0)
+                tuned_val_acc = accuracy_score(y_val, y_pred)
+                 
+                logging.info(
+                     f"Tuned Model Performance on Validation Set"
+                     f"Val Accuracy: {tuned_val_acc:.4f}, "
+                     f"Val F1: {tuned_val_f1:.4f}, "
+                     f"Val ROC-AUC: {tuned_val_roc_auc:.4f}"
+                )
+                 
+                # Replace properties with tuned properties
+                best_model = best_tuned_model
+                best_val_roc_auc = tuned_val_roc_auc
+                best_val_f1 = tuned_val_f1
+                best_val_acc = tuned_val_acc
+            else:
+                logging.info(f"No parameter grid defined for {best_model_name}. Skipping tuning.")
 
             # --- Save the best model ---
             save_object(
