@@ -40,15 +40,15 @@ class DataTransformation:
             service_cols = ['PhoneService', 'InternetService', 'OnlineSecurity', 'OnlineBackup', 
                             'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies']
             
-            df['ServiceCount'] = 0
+            df['ServiceCount'] = 0.0
             for col in service_cols:
                 if col in df.columns:
                     if col == 'InternetService':
-                        df['ServiceCount'] += (df[col] != 'No').astype(int)
+                        df['ServiceCount'] = df['ServiceCount'] + (df[col] != 'No').astype(float)
                     elif col == 'PhoneService':
-                        df['ServiceCount'] += (df[col] == 'Yes').astype(int)
+                        df['ServiceCount'] = df['ServiceCount'] + (df[col] == 'Yes').astype(float)
                     else:
-                        df['ServiceCount'] += (df[col] == 'Yes').astype(int)
+                        df['ServiceCount'] = df['ServiceCount'] + (df[col] == 'Yes').astype(float)
 
             return df
         except Exception as e:

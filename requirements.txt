@@ -10,4 +10,5 @@ jupyterlab
 lightgbm
 dill
 imblearn
+flask
 -e .

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Result</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --primary-color: #6366f1;
+            --dark-bg: #0f172a;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .container {
+            max-width: 800px;
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header-section h1 {
+            color: white;
+            font-weight: 700;
+            font-size: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            background: white;
+        }
+
+        .result-header {
+            text-align: center;
+            padding: 2rem;
+            border-radius: 15px 15px 0 0;
+            background: linear-gradient(135deg, var(--primary-color), #818cf8);
+            color: white;
+        }
+
+        .result-header h2 {
+            margin-bottom: 0.5rem;
+        }
+
+        .prediction-badge {
+            display: inline-block;
+            padding: 0.75rem 2rem;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.5rem;
+            margin-top: 1rem;
+            animation: pulse 2s infinite;
+        }
+
+        .badge-low {
+            background: linear-gradient(135deg, var(--success-color), #059669);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .badge-high {
+            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .result-content {
+            padding: 2rem;
+        }
+
+        .stat-box {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .stat-box h5 {
+            color: #64748b;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-box .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .stat-box .value.probability {
+            color: var(--danger-color);
+        }
+
+        .stat-box .value.confidence {
+            color: var(--success-color);
+        }
+
+        .recommendation-box {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .recommendation-box h4 {
+            color: #92400e;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .recommendation-box ul {
+            margin-bottom: 0;
+        }
+
+        .recommendation-box li {
+            margin-bottom: 0.5rem;
+            color: #78350f;
+        }
+
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            background: #f8fafc;
+            border-radius: 0 0 15px 15px;
+        }
+
+        .progress-ring {
+            position: relative;
+            width: 180px;
+            height: 180px;
+        }
+
+        .progress-ring__circle {
+            transition: stroke-dashoffset 1s ease;
+        }
+
+        .probability-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .probability-text .percent {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .probability-text .label {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .error-message {
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            color: #b91c1c;
+        }
+
+        @media (max-width: 768px) {
+            .btn-group {
+                flex-direction: column;
+            }
+            .result-content {
+                padding: 1rem;
+            }
+            .stat-box .value {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="header-section">
+            <h1><i class="bi bi-graph-up"></i> Prediction Results</h1>
+            <p class="text-white-50">Analysis complete. Here's what our model found.</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i> Error: {{ error }}
+        </div>
+        <a href="/" class="btn btn-primary">Back to Form</a>
+        {% else %}
+        <div class="card">
+            <div class="result-header">
+                <h2>Churn Prediction</h2>
+                <div class="prediction-badge {% if result.prediction == 'Yes' %}badge-high{% else %}badge-low{% endif %}">
+                    {{ result.prediction }}
+                </div>
+                <p class="mb-0 mt-2">Based on customer profile analysis</p>
+            </div>
+
+            <div class="result-content">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="stat-box">
+                            <h5>Churn Probability</h5>
+                            <div class="value probability">{{ (result.churn_probability * 100)|round(1) }}%</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="stat-box">
+                            <h5>Model Confidence</h5>
+                            <div class="value confidence">{{ (result.confidence * 100)|round(1) }}%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="progress-ring">
+                        <svg width="180" height="180">
+                            <circle class="progress-ring__circle"
+                                stroke="#e2e8f0"
+                                stroke-width="15"
+                                fill="transparent"
+                                r="75"
+                                cx="90"
+                                cy="90"/>
+                            <circle class="progress-ring__circle"
+                                stroke="#ef4444"
+                                stroke-width="15"
+                                stroke-dasharray="{{ result.churn_probability * 471 }} 471"
+                                stroke-dashoffset="0"
+                                fill="transparent"
+                                r="75"
+                                cx="90"
+                                cy="90"/>
+                        </svg>
+                        <div class="probability-text">
+                            <div class="percent">{{ (result.churn_probability * 100)|round(0) }}%</div>
+                            <div class="label">Churn Risk</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recommendation-box">
+                    <h4><i class="bi bi-lightbulb"></i> Recommendations</h4>
+                    {% if result.prediction == 'Yes' %}
+                    <p><strong>High Risk of Churn - Immediate Action Recommended:</strong></p>
+                    <ul>
+                        <li>Consider offering a loyalty discount or retention package</li>
+                        <li>Reach out to understand customer concerns</li>
+                        <li>Offer additional services or upgrades</li>
+                        <li>Assign a dedicated account manager</li>
+                        <li>Review their service usage patterns for targeted offers</li>
+                    </ul>
+                    {% else %}
+                    <p><strong>Low Risk of Churn - Continue Engagement:</strong></p>
+                    <ul>
+                        <li>Maintain current service quality</li>
+                        <li>Offer upsell opportunities based on usage patterns</li>
+                        <li>Engage with content about new features</li>
+                        <li>Implement referral program</li>
+                        <li>Monitor for any changes in behavior</li>
+                    </ul>
+                    {% endif %}
+                </div>
+
+                <div class="btn-group">
+                    <a href="/" class="btn btn-primary">
+                        <i class="bi bi-arrow-left"></i> New Prediction
+                    </a>
+                    <button onclick="window.print()" class="btn btn-secondary">
+                        <i class="bi bi-printer"></i> Print Result
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="text-center mt-4">
+            <p class="text-white-50">Powered by Machine Learning | Customer Churn Prediction System v1.0</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
