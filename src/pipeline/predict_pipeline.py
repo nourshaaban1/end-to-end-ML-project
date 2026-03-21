@@ -132,7 +132,7 @@ class CustomData:
         TotalCharges: float,
     ):
         self.gender = gender
-        self.SeniorCitizen = str(SeniorCitizen)  # FIX Bug 3: enforce str at construction
+        self.SeniorCitizen = str(SeniorCitizen)
         self.Partner = Partner
         self.Dependents = Dependents
         self.tenure = tenure

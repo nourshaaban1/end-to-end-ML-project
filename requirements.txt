@@ -1,9 +1,9 @@
 pypdf
 PyPDF2
 numpy
-pandas
+pandas==3.0.1
 matplotlib
-scikit-learn
+scikit-learn==1.8.0
 scipy
 seaborn
 jupyterlab
