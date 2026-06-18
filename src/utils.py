@@ -216,3 +216,195 @@ def load_object(file_path: Path):
             return dill.load(file_obj)
     except Exception as e:
         raise CustomException(e, sys)
+
+
+# ==================== Neural Network Utilities (PyTorch) ====================
+
+import torch
+import torch.nn as nn
+from src.components.neural_network import ChurnClassifier, create_torch_dataloader
+
+
+def train_neural_network(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_val: np.ndarray,
+    y_val: np.ndarray,
+    input_features: int,
+    hidden_layers: list = None,
+    epochs: int = 100,
+    batch_size: int = 32,
+    learning_rate: float = 0.001,
+    patience: int = 10,
+    device: str = None
+):
+    """
+    Train a neural network classifier for churn prediction.
+
+    Args:
+        X_train: Training features
+        y_train: Training labels
+        X_val: Validation features
+        y_val: Validation labels
+        input_features: Number of input features
+        hidden_layers: List of hidden layer sizes
+        epochs: Maximum number of epochs
+        batch_size: Batch size
+        learning_rate: Learning rate
+        patience: Early stopping patience
+        device: Device to use ('cuda' or 'cpu')
+
+    Returns:
+        trained_model, training_history dict
+    """
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else:
+        device = torch.device(device)
+
+    if hidden_layers is None:
+        hidden_layers = [64, 32, 16]
+
+    # Initialize model
+    model = ChurnClassifier(
+        input_features=input_features,
+        hidden_layers=hidden_layers,
+        dropout=0.3
+    ).to(device)
+
+    # Loss and optimizer
+    criterion = nn.BCELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Create data loaders
+    train_loader = create_torch_dataloader(X_train, y_train, batch_size=batch_size, shuffle=True)
+    val_loader = create_torch_dataloader(X_val, y_val, batch_size=batch_size, shuffle=False)
+
+    # Training history
+    history = {
+        'train_loss': [],
+        'val_loss': [],
+        'val_accuracy': [],
+        'val_roc_auc': []
+    }
+
+    best_val_roc_auc = 0.0
+    best_model_state = None
+    epochs_without_improvement = 0
+
+    for epoch in range(epochs):
+        # Training phase
+        model.train()
+        train_losses = []
+
+        for X_batch, y_batch in train_loader:
+            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(X_batch)
+            loss = criterion(outputs, y_batch)
+            loss.backward()
+            optimizer.step()
+
+            train_losses.append(loss.item())
+
+        # Validation phase
+        model.eval()
+        val_losses = []
+        all_preds = []
+        all_targets = []
+        all_proba = []
+
+        with torch.no_grad():
+            for X_batch, y_batch in val_loader:
+                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+                outputs = model(X_batch)
+                loss = criterion(outputs, y_batch)
+                val_losses.append(loss.item())
+
+                preds = (outputs > 0.5).cpu().numpy().flatten()
+                all_preds.extend(preds)
+                all_targets.extend(y_batch.cpu().numpy().flatten())
+                all_proba.extend(outputs.cpu().numpy().flatten())
+
+        # Compute metrics
+        avg_train_loss = np.mean(train_losses)
+        avg_val_loss = np.mean(val_losses)
+        val_acc = accuracy_score(all_targets, all_preds)
+        val_roc_auc = roc_auc_score(all_targets, all_proba)
+
+        history['train_loss'].append(avg_train_loss)
+        history['val_loss'].append(avg_val_loss)
+        history['val_accuracy'].append(val_acc)
+        history['val_roc_auc'].append(val_roc_auc)
+
+        logging.info(
+            f"NN Epoch {epoch+1}/{epochs} - "
+            f"Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, "
+            f"Val Acc: {val_acc:.4f}, Val ROC-AUC: {val_roc_auc:.4f}"
+        )
+
+        # Early stopping and best model tracking
+        if val_roc_auc > best_val_roc_auc:
+            best_val_roc_auc = val_roc_auc
+            best_model_state = model.state_dict().copy()
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+
+        if epochs_without_improvement >= patience:
+            logging.info(f"Early stopping at epoch {epoch+1}. Best ROC-AUC: {best_val_roc_auc:.4f}")
+            break
+
+    # Load best model
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+
+    return model, history
+
+
+def evaluate_neural_network(model: ChurnClassifier, X: np.ndarray, y: np.ndarray, device: str = None):
+    """
+    Evaluate a trained neural network model.
+
+    Args:
+        model: Trained ChurnClassifier
+        X: Features
+        y: True labels
+
+    Returns:
+        dict with accuracy, f1, roc_auc, precision, recall
+    """
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    model.eval()
+    model.to(device)
+
+    X_tensor = torch.FloatTensor(X).to(device)
+    y_tensor = torch.FloatTensor(y).reshape(-1, 1).to(device)
+
+    with torch.no_grad():
+        outputs = model(X_tensor)
+        preds = (outputs > 0.5).cpu().numpy().flatten()
+        proba = outputs.cpu().numpy().flatten()
+
+    from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, precision_score, recall_score
+
+    return {
+        'accuracy': accuracy_score(y, preds),
+        'f1': f1_score(y, preds, zero_division=0),
+        'roc_auc': roc_auc_score(y, proba),
+        'precision': precision_score(y, preds, zero_division=0),
+        'recall': recall_score(y, preds, zero_division=0)
+    }
+
+
+def save_torch_model(model: ChurnClassifier, file_path: Path):
+    """Save a trained PyTorch model."""
+    model.save(file_path)
+
+
+def load_torch_model(file_path: Path, input_features: int):
+    """Load a trained PyTorch model."""
+    return ChurnClassifier.load(file_path, input_features)

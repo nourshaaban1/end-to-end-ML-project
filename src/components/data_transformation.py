@@ -26,34 +26,31 @@ class DataTransformation:
     def __init__(self):
         self.data_transformation_config = DataTransformationConfig()
 
-    def get_feature_engineered_df(self, df: pd.DataFrame):
-        try:
-            # Convert SeniorCitizen to string (categorical)
-            if 'SeniorCitizen' in df.columns:
-                df['SeniorCitizen'] = df['SeniorCitizen'].astype(str)
+    def get_feature_engineered_df(self, df):
+        if 'SeniorCitizen' in df.columns:
+            df['SeniorCitizen'] = df['SeniorCitizen'].astype(str)
 
-            # Feature Engineering: Average monthly charge per year of tenure
-            if 'TotalCharges' in df.columns and 'tenure' in df.columns:
-                df['AvgMonthlyCharge'] = df['TotalCharges'] / (df['tenure'] + 1)
+        if 'TotalCharges' in df.columns:
+            df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
 
-            # Feature Engineering: Service density
-            service_cols = ['PhoneService', 'InternetService', 'OnlineSecurity', 'OnlineBackup', 
-                            'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies']
-            
-            df['ServiceCount'] = 0.0
-            for col in service_cols:
-                if col in df.columns:
-                    if col == 'InternetService':
-                        df['ServiceCount'] = df['ServiceCount'] + (df[col] != 'No').astype(float)
-                    elif col == 'PhoneService':
-                        df['ServiceCount'] = df['ServiceCount'] + (df[col] == 'Yes').astype(float)
-                    else:
-                        df['ServiceCount'] = df['ServiceCount'] + (df[col] == 'Yes').astype(float)
+        if 'TotalCharges' in df.columns and 'tenure' in df.columns:
+            df['AvgMonthlyCharge'] = df['TotalCharges'] / (df['tenure'] + 1)
 
-            return df
-        except Exception as e:
-            raise CustomException(e, sys)
-    
+        service_cols = [
+            'PhoneService','InternetService','OnlineSecurity','OnlineBackup',
+            'DeviceProtection','TechSupport','StreamingTV','StreamingMovies'
+        ]
+
+        df['ServiceCount'] = 0.0
+        for col in service_cols:
+            if col in df.columns:
+                if col == 'InternetService':
+                    df['ServiceCount'] += (df[col] != 'No').astype(float)
+                else:
+                    df['ServiceCount'] += (df[col] == 'Yes').astype(float)
+
+        return df
+
     def get_data_transformer_object(self):
         """
         This function is responsible for creating the preprocessor object
