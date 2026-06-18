@@ -18,12 +18,10 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    """Handle prediction requests."""
     error = None
     result = None
 
     try:
-        # Collect form data
         features = CustomData(
             gender=request.form.get("gender"),
             SeniorCitizen=request.form.get("SeniorCitizen"),
@@ -46,26 +44,18 @@ def predict():
             TotalCharges=float(request.form.get("TotalCharges")),
         )
 
-        # Convert to DataFrame
         features_df = features.to_dataframe()
 
-        # Make prediction
         pipeline = PredictPipeline()
-        prediction, label_encoder = pipeline.predict(features_df)
+        prediction, label_encoder, proba = pipeline.predict(features_df, use_nn=False)
 
-        # Get probability scores
-        preprocessor, _, model = pipeline.load_all_objects()
-        features_transformed = preprocessor.transform(features_df)
-        proba = model.predict_proba(features_transformed)[0]
-
-        # Prepare result
         predicted_class = label_encoder.inverse_transform([int(prediction[0])])[0]
-        churn_probability = proba[1] if len(proba) > 1 else proba[0]
+        churn_probability = float(proba[0]) if proba is not None else None
 
         result = {
             "prediction": predicted_class,
             "churn_probability": churn_probability,
-            "confidence": max(proba),
+            "confidence": churn_probability if churn_probability is not None else None,
         }
 
     except Exception as e:
@@ -73,10 +63,8 @@ def predict():
 
     return render_template("result.html", result=result, error=error)
 
-
 @app.route("/predict-api", methods=["POST"])
 def predict_api():
-    """API endpoint for prediction (JSON input)."""
     try:
         data = request.get_json()
 
@@ -104,26 +92,21 @@ def predict_api():
 
         features_df = features.to_dataframe()
         pipeline = PredictPipeline()
-        prediction, label_encoder = pipeline.predict(features_df)
-
-        preprocessor, _, model = pipeline.load_all_objects()
-        features_transformed = preprocessor.transform(features_df)
-        proba = model.predict_proba(features_transformed)[0]
+        prediction, label_encoder, proba = pipeline.predict(features_df, use_nn=False)
 
         predicted_class = label_encoder.inverse_transform([int(prediction[0])])[0]
-        churn_probability = proba[1] if len(proba) > 1 else proba[0]
+        churn_probability = float(proba[0]) if proba is not None else None
 
         result = {
             "prediction": predicted_class,
-            "churn_probability": round(churn_probability, 4),
-            "confidence": round(max(proba), 4),
+            "churn_probability": round(churn_probability, 4) if churn_probability is not None else None,
+            "confidence": round(churn_probability, 4) if churn_probability is not None else None,
         }
 
         return jsonify(result)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-
 
 if __name__ == "__main__":
     # Ensure artifacts exist
